@@ -1,1 +1,64 @@
 
+
+name: Build iPhone Duo APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+
+      - name: Extract Android project
+        run: |
+          mkdir extracted
+          unzip -q iPhoneDuoLauncher-Xperia1V-Android15-CloudBuild.zip -d extracted
+          PROJECT_DIR=$(find extracted -name settings.gradle.kts -print -quit | xargs dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Cannot find Android project"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Build debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhoneDuo-Xperia1V-debug-apk
+          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
